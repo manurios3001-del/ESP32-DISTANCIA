@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ITVN - Control Climático Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { background: #050a07; color: #00ff9d; font-family: 'Rajdhani', sans-serif; }
+        .cyber-panel { background: rgba(10, 25, 15, 0.9); border: 1px solid #00ff9d33; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        .val-display { font-family: 'Orbitron', sans-serif; color: #fff; text-shadow: 0 0 10px #00ff9d55; }
+        canvas { background: #000; height: 80px; width: 100%; border-bottom: 2px solid #00ff9d; margin-top: 10px; }
+        .btn-admin { transition: all 0.3s; border: 1px solid #00ff9d55; }
+        .btn-admin:hover { background: #00ff9d; color: #000; box-shadow: 0 0 15px #00ff9d; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+<div id="modalSetup" class="fixed inset-0 bg-black/95 z-50 flex items-center justify-center hidden">
+    <div class="cyber-panel p-8 rounded-2xl max-w-md w-full border-2 border-green-500">
+        <h2 class="text-2xl font-bold mb-4 text-white text-center">CONFIGURACIÓN CLOUD</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="text-xs text-green-500">URL DE FIREBASE</label>
+                <input type="text" id="dbUrl" placeholder="https://tu-proyecto.firebaseio.com" class="w-full bg-black border border-green-900 p-3 rounded text-white mt-1">
+            </div>
+            <div>
+                <label class="text-xs text-green-500">WEB API KEY</label>
+                <input type="text" id="dbKey" placeholder="AIzaSy..." class="w-full bg-black border border-green-900 p-3 rounded text-white mt-1">
+            </div>
+            <button onclick="saveSettings()" class="w-full bg-green-600 text-white font-bold py-3 rounded hover:bg-green-400 transition">INICIALIZAR SISTEMA</button>
+        </div>
+    </div>
+</div>
+
+<div class="max-w-6xl mx-auto">
+    <header class="flex flex-col md:flex-row justify-between items-center border-b border-green-500 pb-4 mb-8">
+        <div class="text-center md:text-left">
+            <h1 class="text-3xl font-bold tracking-tighter text-white">ITVN <span class="text-green-500">INTELLIGENT HANGAR</span></h1>
+            <p id="systemMode" class="text-xs text-orange-400 tracking-[0.3em]">MODO: CONECTANDO...</p>
+        </div>
+        <button onclick="resetApp()" class="mt-4 md:mt-0 text-[10px] opacity-50 hover:opacity-100 border border-red-500 px-2 py-1 rounded">CAMBIAR CREDENCIALES</button>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="cyber-panel p-4 rounded-xl">
+                <div class="flex justify-between"><span>HANGAR 01</span><span id="t1" class="val-display">--.-°</span></div>
+                <canvas id="chart1"></canvas>
+            </div>
+            <div class="cyber-panel p-4 rounded-xl">
+                <div class="flex justify-between"><span>HANGAR 02</span><span id="t2" class="val-display">--.-°</span></div>
+                <canvas id="chart2"></canvas>
+            </div>
+            <div class="cyber-panel p-6 rounded-2xl lg:col-span-2 border-2 border-green-500/40">
+                <div class="flex justify-between items-end mb-2">
+                    <span class="text-xl font-bold uppercase tracking-widest">Promedio General</span>
+                    <span id="tProm" class="text-6xl val-display text-green-400">--.-°</span>
+                </div>
+                <canvas id="chartProm" style="height: 100px;"></canvas>
+            </div>
+        </div>
+
+        <div class="cyber-panel p-6 rounded-xl">
+            <div id="loginSection">
+                <h3 class="text-white font-bold mb-4 text-center text-sm uppercase">Acceso Restringido</h3>
+                <input type="password" id="adminPin" placeholder="PIN" class="w-full bg-black border border-green-900 p-3 rounded mb-3 text-center text-green-500">
+                <button onclick="checkAdmin()" class="w-full bg-green-900/40 py-2 rounded text-xs btn-admin font-bold">DESBLOQUEAR PANEL</button>
+            </div>
+
+            <div id="adminControls" class="hidden space-y-4">
+                <div class="text-center border-b border-green-900 pb-2 mb-4">
+                    <span class="text-[10px] bg-orange-900/50 px-2 py-1 rounded text-orange-400">PANEL DE PRIORIDAD</span>
+                </div>
+                <button onclick="sendAction('CALOR_ON')" class="w-full bg-orange-700/80 hover:bg-orange-600 py-3 rounded text-xs font-bold text-white">FORZAR CALOR</button>
+                <button onclick="sendAction('FRIO_ON')" class="w-full bg-blue-700/80 hover:bg-blue-600 py-3 rounded text-xs font-bold text-white">FORZAR FRÍO</button>
+                <button onclick="sendAction('TODO_OFF')" class="w-full bg-gray-800 py-3 rounded text-xs text-gray-400">APAGAR SISTEMA</button>
+                
+                <div class="pt-4 mt-4 border-t border-green-900">
+                    <button onclick="sendAction('AUTO')" class="w-full bg-green-500 text-black py-3 rounded text-xs font-bold shadow-[0_0_15px_rgba(0,255,157,0.3)]">RETORNAR A MODO AUTO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    let database;
+    const chartsData = [[], [], []]; // t1, t2, prom
+    const canvasIds = ["chart1", "chart2", "chartProm"];
+
+    window.onload = () => {
+        const url = localStorage.getItem('itvn_url');
+        const key = localStorage.getItem('itvn_key');
+        if(!url || !key) document.getElementById('modalSetup').classList.remove('hidden');
+        else initApp(url, key);
+    };
+
+    window.saveSettings = () => {
+        const u = document.getElementById('dbUrl').value.trim();
+        const k = document.getElementById('dbKey').value.trim();
+        if(u && k) {
+            localStorage.setItem('itvn_url', u);
+            localStorage.setItem('itvn_key', k);
+            location.reload();
+        }
+    };
+
+    window.resetApp = () => { localStorage.clear(); location.reload(); };
+
+    function initApp(url, key) {
+        const app = initializeApp({ apiKey: key, databaseURL: url });
+        database = getDatabase(app);
+
+        // Escuchar datos del ESP32
+        onValue(ref(database, 'sistema_itvn'), (snapshot) => {
+            const data = snapshot.val();
+            if(!data) return;
+
+            document.getElementById('t1').innerText = data.t1.toFixed(1) + "°";
+            document.getElementById('t2').innerText = data.t2.toFixed(1) + "°";
+            document.getElementById('tProm').innerText = data.prom.toFixed(1) + "°";
+            document.getElementById('systemMode').innerText = "MODO: " + data.modo;
+
+            [data.t1, data.t2, data.prom].forEach((v, i) => drawHistory(i, v));
+        });
+    }
+
+    function drawHistory(idx, val) {
+        const canvas = document.getElementById(canvasIds[idx]);
+        const ctx = canvas.getContext('2d');
+        chartsData[idx].push(val);
+        if(chartsData[idx].length > 50) chartsData[idx].shift();
+
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        ctx.strokeStyle = "#00ff9d";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        chartsData[idx].forEach((v, i) => {
+            const x = i * (canvas.width / 50);
+            const y = canvas.height - (v * 1.5); // Escala simple
+            i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+    }
+
+    window.checkAdmin = () => {
+        if(document.getElementById('adminPin').value === "1234") {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('adminControls').classList.remove('hidden');
+        } else {
+            alert("PIN INCORRECTO");
+        }
+    };
+
+    window.sendAction = (cmd) => {
+        set(ref(database, 'control/comando'), cmd);
+    };
+</script>
+</body>
+</html>
